@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>仙人掲示板</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>仙人掲示板</h1>
+
+    <form id="postForm">
+      <input type="text" id="username" placeholder="ユーザー名" required />
+      <input type="password" id="password" placeholder="パスワード" required />
+      <textarea id="message" placeholder="💬 メッセージ (絵文字OK)" required></textarea>
+      <button type="submit">投稿</button>
+    </form>
+
+    <p><a href="register.html">新規ユーザー登録はこちら</a></p>
+    <div id="error" class="error"></div>
+    <div id="posts"></div>
+  </div>
+
+  <script>
+    async function fetchPosts() {
+      const res = await fetch('/api/posts');
+      const posts = await res.json();
+      document.getElementById('posts').innerHTML = posts.map(p => `
+        <div class="post">
+          <p><strong>${p.name}</strong>：${p.message}</p>
+          <small>${new Date(p.timestamp).toLocaleString()}</small>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('postForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const message = document.getElementById('message').value.trim();
+      const error = document.getElementById('error');
+
+      const res = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, message })
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        error.textContent = result.error || '投稿失敗';
+      } else {
+        error.textContent = '';
+        document.getElementById('message').value = '';
+        fetchPosts();
+      }
+    });
+
+    fetchPosts();
+  </script>
+</body>
+</html>
