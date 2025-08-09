@@ -2,61 +2,283 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>仙人掲示板試験運用版（投稿はサーバー再起動で消えます ）/title>
-  <link rel="stylesheet" href="style.css" />
+  <title>仙人掲示板</title>
+  <style>
+    body {
+      font-family: "Yu Gothic", "Meiryo", sans-serif;
+      background: #f0f0f0;
+      margin: 0; padding: 1em;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 1em;
+    }
+    h1 {
+      color: #444;
+    }
+    .form-group {
+      margin-bottom: 0.5em;
+    }
+    input, textarea, button {
+      width: 100%;
+      padding: 0.5em;
+      font-size: 1rem;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    button {
+      background: #3c78d8;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-top: 0.5em;
+    }
+    button:hover {
+      background: #2a5dad;
+    }
+    #posts {
+      margin-top: 2em;
+      border-top: 1px solid #ccc;
+      padding-top: 1em;
+    }
+    .post {
+      background: white;
+      padding: 0.75em;
+      margin-bottom: 1em;
+      border-radius: 4px;
+      box-shadow: 0 0 4px #ccc;
+    }
+    .post .username {
+      font-weight: bold;
+      color: #3c78d8;
+      margin-bottom: 0.25em;
+    }
+    .post .date {
+      font-size: 0.8rem;
+      color: #666;
+      margin-bottom: 0.5em;
+    }
+    .error {
+      color: red;
+      margin-bottom: 0.5em;
+    }
+    .info {
+      color: green;
+      margin-bottom: 0.5em;
+    }
+    #auth-section, #post-section {
+      background: white;
+      padding: 1em;
+      border-radius: 6px;
+      box-shadow: 0 0 6px #ccc;
+      margin-bottom: 1em;
+    }
+    #logout-btn {
+      background: #d83c3c;
+      margin-top: 0;
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
+  <header>
     <h1>仙人掲示板</h1>
+  </header>
 
-    <form id="postForm">
-      <input type="text" id="username" placeholder="ユーザー名" required />
-      <input type="password" id="password" placeholder="パスワード" required />
-      <textarea id="message" placeholder="💬 メッセージ (絵文字OK)" required></textarea>
-      <button type="submit">投稿</button>
-    </form>
+  <div id="auth-section">
+    <div id="register-form">
+      <h2>新規登録</h2>
+      <div class="error" id="register-error"></div>
+      <input type="text" id="register-username" placeholder="ユーザー名" />
+      <input type="password" id="register-password" placeholder="パスワード" />
+      <button id="register-btn">登録する</button>
+    </div>
 
-    <p><a href="register.html">新規ユーザー登録はこちら</a></p>
-    <div id="error" class="error"></div>
-    <div id="posts"></div>
+    <div id="login-form" style="margin-top:1em;">
+      <h2>ログイン</h2>
+      <div class="error" id="login-error"></div>
+      <input type="text" id="login-username" placeholder="ユーザー名" />
+      <input type="password" id="login-password" placeholder="パスワード" />
+      <button id="login-btn">ログイン</button>
+    </div>
   </div>
 
-  <script>
-    async function fetchPosts() {
-      const res = await fetch('/api/posts');
-      const posts = await res.json();
-      document.getElementById('posts').innerHTML = posts.map(p => `
-        <div class="post">
-          <p><strong>${p.name}</strong>：${p.message}</p>
-          <small>${new Date(p.timestamp).toLocaleString()}</small>
-        </div>
-      `).join('');
+  <div id="post-section" style="display:none;">
+    <div>
+      <span id="welcome-msg"></span>
+      <button id="logout-btn">ログアウト</button>
+    </div>
+    <h2>投稿する</h2>
+    <div class="error" id="post-error"></div>
+    <textarea id="post-content" placeholder="ここに投稿を書いてください"></textarea>
+    <button id="post-btn">投稿</button>
+  </div>
+
+  <div id="posts">
+    <h2>投稿一覧</h2>
+    <div id="posts-list"></div>
+  </div>
+
+<script>
+  const registerBtn = document.getElementById('register-btn');
+  const loginBtn = document.getElementById('login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+  const postBtn = document.getElementById('post-btn');
+
+  const registerError = document.getElementById('register-error');
+  const loginError = document.getElementById('login-error');
+  const postError = document.getElementById('post-error');
+
+  const authSection = document.getElementById('auth-section');
+  const postSection = document.getElementById('post-section');
+  const welcomeMsg = document.getElementById('welcome-msg');
+
+  async function fetchPosts() {
+    const res = await fetch('/api/posts');
+    const posts = await res.json();
+    const postsList = document.getElementById('posts-list');
+    postsList.innerHTML = '';
+    for (const post of posts) {
+      const d = new Date(post.created_at);
+      const postEl = document.createElement('div');
+      postEl.className = 'post';
+      postEl.innerHTML = `
+        <div class="username">${escapeHtml(post.username)}</div>
+        <div class="date">${d.toLocaleString()}</div>
+        <div class="content">${escapeHtml(post.content)}</div>
+      `;
+      postsList.appendChild(postEl);
     }
+  }
 
-    document.getElementById('postForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value.trim();
-      const message = document.getElementById('message').value.trim();
-      const error = document.getElementById('error');
+  function escapeHtml(text) {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
 
+  registerBtn.onclick = async () => {
+    registerError.textContent = '';
+    const username = document.getElementById('register-username').value.trim();
+    const password = document.getElementById('register-password').value;
+    if(!username || !password) {
+      registerError.textContent = 'ユーザー名とパスワードを入力してください';
+      return;
+    }
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if(res.ok){
+        alert('登録成功しました。自動的にログインします。');
+        setLoggedIn(username);
+      } else {
+        registerError.textContent = data.error || '登録に失敗しました';
+      }
+    } catch(e) {
+      registerError.textContent = '通信エラー';
+    }
+  };
+
+  loginBtn.onclick = async () => {
+    loginError.textContent = '';
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    if(!username || !password) {
+      loginError.textContent = 'ユーザー名とパスワードを入力してください';
+      return;
+    }
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if(res.ok){
+        setLoggedIn(username);
+      } else {
+        loginError.textContent = data.error || 'ログインに失敗しました';
+      }
+    } catch(e) {
+      loginError.textContent = '通信エラー';
+    }
+  };
+
+  logoutBtn.onclick = async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    setLoggedOut();
+  };
+
+  postBtn.onclick = async () => {
+    postError.textContent = '';
+    const content = document.getElementById('post-content').value.trim();
+    if(!content) {
+      postError.textContent = '投稿内容を入力してください';
+      return;
+    }
+    try {
       const res = await fetch('/api/posts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, message })
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ content })
       });
-
-      const result = await res.json();
-      if (!res.ok) {
-        error.textContent = result.error || '投稿失敗';
-      } else {
-        error.textContent = '';
-        document.getElementById('message').value = '';
+      const data = await res.json();
+      if(res.ok){
+        document.getElementById('post-content').value = '';
         fetchPosts();
+      } else {
+        postError.textContent = data.error || '投稿に失敗しました';
       }
-    });
+    } catch(e) {
+      postError.textContent = '通信エラー';
+    }
+  };
 
+  async function checkLogin() {
+    try {
+      const res = await fetch('/api/me');
+      if(res.ok) {
+        const data = await res.json();
+        setLoggedIn(data.username);
+      } else {
+        setLoggedOut();
+      }
+    } catch(e) {
+      setLoggedOut();
+    }
+  }
+
+  function setLoggedIn(username) {
+    authSection.style.display = 'none';
+    postSection.style.display = 'block';
+    welcomeMsg.textContent = `${username} さん、ようこそ`;
     fetchPosts();
-  </script>
+  }
+
+  function setLoggedOut() {
+    authSection.style.display = 'block';
+    postSection.style.display = 'none';
+    welcomeMsg.textContent = '';
+    fetchPosts();
+  }
+
+  checkLogin();
+  fetchPosts();
+
+</script>
 </body>
 </html>
