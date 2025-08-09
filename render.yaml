@@ -2,6 +2,12 @@ services:
   - type: web
     name: sennin-bbs
     env: node
-    buildCommand: npm install
-    startCommand: npm start
     plan: free
+    region: oregon # お好みで変更可
+    branch: main
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: DATABASE_URL
+        fromSecret: DATABASE_URL_SECRET  # RenderのSecretに設定した場合
+    autoDeploy: true
